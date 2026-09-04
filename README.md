@@ -1,4 +1,4 @@
-# Openwrt-wan-keep-alive-system
+# Openwrt wan keep alive system
 The system is used to monitor the WAN interface and in case of a problem with it, attempts to restart first the specified interfaces and if not success restore connetion then the entire router.
 The settings interface will appear in the LuCI menu under Services -> WAN Keep Alive.
 All parameters are configured through the LuCI interface:
