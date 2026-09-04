@@ -1,31 +1,31 @@
 #!/bin/sh
 
-echo "==== Startirane na automatichnata instalaciya na WAN Keep-Alive ===="
+echo "==== Instalation WAN Keep-Alive ===="
 
-# 1. Proverka na paketniya menidzhar (apk ili opkg)
+# 1. Check openwrt pakage manager (apk or opkg)
 if command -v apk >/dev/null 2>&1; then
-    echo "Nameren e apk menidzhar. Obnovyavane i instalirane..."
+    echo "apk software menager available. Updating and instaling..."
     apk update
     apk add luci-compat
 elif command -v opkg >/dev/null 2>&1; then
-    echo "Nameren e opkg menidzhar. Obnovyavane i instalirane..."
+    echo "opkg software menager available. Updating and instaling..."
     opkg update
     opkg install luci-compat
 else
-    echo "Greshka: Ne e nameren nito apk, nito opkg!"
+    echo "ERROR: Missing apk or opkg software menager!"
     exit 1
 fi
 
-# 2. Sazdavane na neobhodimite papki
-echo "Sazdavane na direktorii za LuCI..."
+# 2. Creating direcrories
+echo "Creating LuCI direcrories..."
 mkdir -p /usr/lib/lua/luci/model/cbi
 mkdir -p /usr/lib/lua/luci/controller
 mkdir -p /etc/config
 mkdir -p /usr/bin
 mkdir -p /etc/init.d
 
-# 3. Sazdavane na UCI konfiguratsiyata (/etc/config/wankeepalive)
-echo "Sazdavane na /etc/config/wankeepalive..."
+# 3. Creating UCI configuration (/etc/config/wankeepalive)
+echo "Creating /etc/config/wankeepalive..."
 cat << 'EOF' > /etc/config/wankeepalive
 config wankeepalive 'main'
 	option enabled '1'
@@ -36,12 +36,12 @@ config wankeepalive 'main'
 	list target_interfaces 'lte'
 EOF
 
-# 4. Sazdavane na osnovniya daemon script (/usr/bin/wan-keep-alive.sh)
-echo "Sazdavane na /usr/bin/wan-keep-alive.sh..."
+# 4. Creating daemon script (/usr/bin/wan-keep-alive.sh)
+echo "Creating /usr/bin/wan-keep-alive.sh..."
 cat << 'EOF' > /usr/bin/wan-keep-alive.sh
 #!/bin/sh
 
-# Proverka na podrazbirahti se stoinosti i uci nastroiki
+# Checking default value and uci settings
 get_config() {
     ENABLED=$(uci -q get wankeepalive.main.enabled || echo "0")
     CHECK_INTERVAL=$(uci -q get wankeepalive.main.check_interval || echo "120")
@@ -53,7 +53,7 @@ get_config() {
 
 FAIL_COUNT=0
 
-logger -t wankeepalive "Uslugata e startirana uspeshno."
+logger -t wankeepalive "Service wankeepalive is starting successful."
 
 while true; do
     get_config
@@ -65,7 +65,7 @@ while true; do
 
     ONLINE=0
 
-    # Testvanie na vsichki zadani IP adresi
+    # Testing all set IP addresses
     for host in $PING_HOSTS; do
         if ping -c 2 -W 3 "$host" >/dev/null 2>&1; then
             ONLINE=1
@@ -75,26 +75,26 @@ while true; do
 
     if [ $ONLINE -eq 1 ]; then
         if [ $FAIL_COUNT -gt 0 ]; then
-            logger -t wankeepalive "Vruzkata e vuzstanovena. Zabyrsvane na broyacha."
+            logger -t wankeepalive "Connection restored. Reset counter."
             FAIL_COUNT=0
         fi
     else
         FAIL_COUNT=$((FAIL_COUNT + 1))
-        logger -t wankeepalive "Proverkata se provali! Posledovatelni greshki: $FAIL_COUNT"
+        logger -t wankeepalive "Verification failed. Consecutive number of errors: $FAIL_COUNT"
 
-        # Logika za restartirane na routera (pri dostiganie na po-visokia prag)
+        # Router reboot logic (at the higher threshold)
         if [ $FAIL_COUNT -ge $ROUTER_THRESHOLD ]; then
-            logger -t wankeepalive "Dostignat e pragat za restart na routera ($ROUTER_THRESHOLD greshki). Restartirane..."
+            logger -t wankeepalive "Router restart threshold reached ($ROUTER_THRESHOLD errors). Router restarting..."
             sync
             reboot
             exit 0
         fi
 
-        # Logika za restartirane na izbranite interfeysi
+        # Logic for restarting selected interfaces
         if [ $FAIL_COUNT -ge $IF_THRESHOLD ]; then
-            logger -t wankeepalive "Dostignat e pragat za restart na interfeysite ($IF_THRESHOLD greshki)."
+            logger -t wankeepalive "The restart threshold for the selected interfaces has been reached ($IF_THRESHOLD errors)."
             for iface in $TARGET_INTERFACES; do
-                logger -t wankeepalive "Restartirane na interfeys: $iface"
+                logger -t wankeepalive "Restarting interfaces: $iface"
                 ifdown "$iface"
                 sleep 2
                 ifup "$iface"
@@ -108,8 +108,8 @@ EOF
 
 chmod +x /usr/bin/wan-keep-alive.sh
 
-# 5. Sazdavane na init.d / procd usluga (/etc/init.d/wankeepalive)
-echo "Sazdavane na /etc/init.d/wankeepalive..."
+# 5. Creating init.d / procd service (/etc/init.d/wankeepalive)
+echo "Creating /etc/init.d/wankeepalive..."
 cat << 'EOF' > /etc/init.d/wankeepalive
 #!/bin/sh /etc/rc.common
 
@@ -143,8 +143,8 @@ EOF
 
 chmod +x /etc/init.d/wankeepalive
 
-# 6. Sazdavane na LuCI Controller
-echo "Sazdavane na LuCI controller..."
+# 6. Creating LuCI Controller
+echo "Creating LuCI controller..."
 cat << 'EOF' > /usr/lib/lua/luci/controller/wankeepalive.lua
 module("luci.controller.wankeepalive", package.seeall)
 
@@ -157,28 +157,28 @@ function index()
 end
 EOF
 
-# 7. Sazdavane na LuCI Model (CBI)
-echo "Sazdavane na LuCI CBI model..."
+# 7. Creating LuCI Model (CBI)
+echo "Creating LuCI CBI model..."
 cat << 'EOF' > /usr/lib/lua/luci/model/cbi/wankeepalive.lua
-m = Map("wankeepalive", translate("WAN Keep Alive"), translate("Nastroika na avtomati4noto sledene i vuzstanovyavane na internet vruzkata."))
+m = Map("wankeepalive", translate("WAN Keep Alive"), translate("Setting up automatic monitoring and restoration of the Internet connection."))
 
-s = m:section(NamedSection, "main", "wankeepalive", translate("Osnovni nastroiki"))
+s = m:section(NamedSection, "main", "wankeepalive", translate("Main settings"))
 
--- Vkluchvane / Izkluchvane
-e = s:option(Flag, "enabled", translate("Aktivno"))
+-- ON / OFF
+e = s:option(Flag, "enabled", translate("ON"))
 e.rmempty = false
 
 -- Ping Hostove
-hosts = s:option(Value, "ping_hosts", translate("IP adresi za proverka"), translate("Razdeleni sus prostranstvo (naprimer: 1.1.1.1 8.8.8.8)"))
+hosts = s:option(Value, "ping_hosts", translate("IP addresses for verification"), translate("Separated by a space (example: 1.1.1.1 8.8.8.8)"))
 hosts.rmempty = false
 
--- Interval na proverka
-interval = s:option(Value, "check_interval", translate("Interval na proverka (sekundi)"), translate("Vreme mejdu pings (naprimer za 2 min: 120)"))
+-- Check interval
+interval = s:option(Value, "check_interval", translate("Check interval (seconds)"), translate("Time between pings (example for 2 min: 120)"))
 interval.datatype = "uinteger"
 interval.rmempty = false
 
--- Izbor na interfeysi za restart
-ifaces = s:option(MultiValue, "target_interfaces", translate("Interfeysi za restart"), translate("Izberete koi mrejobi interfeysi da se restartirat pri purvia prag"))
+-- Selection of restart interfaces
+ifaces = s:option(MultiValue, "target_interfaces", translate("Interfeysi za restart"), translate("Select which interface(s) to restart when the first threshold is reached"))
 local uci = luci.model.uci.cursor()
 uci:foreach("network", "interface", function(c)
     if c[".name"] ~= "loopback" then
@@ -186,23 +186,23 @@ uci:foreach("network", "interface", function(c)
     end
 end)
 
--- Prag za restart na interfeysi
-if_thresh = s:option(Value, "interface_fail_threshold", translate("Greshki za restart na interfeysa"), translate("Broi posledovatelni greshki predi restart na izbranite interfeysi"))
+-- Interface restart threshold
+if_thresh = s:option(Value, "interface_fail_threshold", translate("Errors for restarting interface(s)"), translate("Number of consecutive errors before restart of selected interfaces"))
 if_thresh.datatype = "uinteger"
 if_thresh.rmempty = false
 
--- Prag za restart na routera
-r_thresh = s:option(Value, "router_fail_threshold", translate("Greshki za restart na routera"), translate("Broi posledovatelni greshki predi restart na celia router"))
+-- Router restart threshold
+r_thresh = s:option(Value, "router_fail_threshold", translate("Errors for Router restart"), translate("Number of consecutive errors before router restart"))
 r_thresh.datatype = "uinteger"
 r_thresh.rmempty = false
 
--- Zastita / Validacia na chislata
+-- Number protection / validation
 function r_thresh.validate(self, value, section)
     local if_val = tonumber(if_thresh:formvalue(section))
     local r_val = tonumber(value)
     
     if r_val and if_val and r_val <= if_val then
-        return nil, translate("Greshka: Pragyt za restart na routera trjabva da e po-goljam ot pragyt za interfeysa!")
+        return nil, translate("Error: The router restart threshold must be greater than the interface(s) restart threshold!")
     end
     return value
 end
@@ -210,8 +210,8 @@ end
 return m
 EOF
 
-# 8. Chistene na LuCI kesh i restartirane na uslugite
-echo "Aktivirane na uslugata i perezarezhdane na kesh..."
+# 8. Cleaning LuCI cash and restarting servicies
+echo "Service activation and cash recharge..."
 /etc/init.d/wankeepalive enable
 
 rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
@@ -220,4 +220,7 @@ rm -rf /tmp/luci-indexcache /tmp/luci-modulecache/
 /etc/init.d/uhttpd restart
 /etc/init.d/wankeepalive restart
 
-echo "==== Uspehsno priklyucheno! WAN Keep-Alive e aktiven v LuCI (Services -> WAN Keep Alive) ===="
+echo "==== Successful installation! WAN Keep-Alive is active on LuCI (Services -> WAN Keep Alive) ===="
+
+# Remove instalation script.
+rm -f "$0"
