@@ -4,7 +4,7 @@ The settings interface will appear in the LuCI menu under Services -> WAN Keep A
 All parameters are configured through the LuCI interface:
 1. System status: ON/OFF
 2. IP addresses used for checking (ping is sent to them)
-3. Interval between checks (e.g. 120 sec).
+3. Interval between checks (default 120 sec).
 4. Interfaces that will be restarted in case of a problem (All selected interfaces will be restarted at once.)
 5. Number of failed checks for restarting the interfaces (default 5).
 6. Number of failed checks for restarting the entire router (default 15).
