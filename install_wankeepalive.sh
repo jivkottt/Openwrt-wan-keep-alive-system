@@ -41,7 +41,7 @@ echo "Creating /usr/bin/wan-keep-alive.sh..."
 cat << 'EOF' > /usr/bin/wan-keep-alive.sh
 #!/bin/sh
 
-# Checking default value and uci settings
+# Proverka na podrazbirahti se stoinosti i uci nastroiki
 get_config() {
     ENABLED=$(uci -q get wankeepalive.main.enabled || echo "0")
     CHECK_INTERVAL=$(uci -q get wankeepalive.main.check_interval || echo "120")
@@ -53,7 +53,7 @@ get_config() {
 
 FAIL_COUNT=0
 
-logger -t wankeepalive "Service wankeepalive is starting successful."
+logger -t wankeepalive "Uslugata e startirana uspeshno."
 
 while true; do
     get_config
@@ -65,7 +65,7 @@ while true; do
 
     ONLINE=0
 
-    # Testing all set IP addresses
+    # Testvanie na vsichki zadani IP adresi
     for host in $PING_HOSTS; do
         if ping -c 2 -W 3 "$host" >/dev/null 2>&1; then
             ONLINE=1
@@ -75,30 +75,31 @@ while true; do
 
     if [ $ONLINE -eq 1 ]; then
         if [ $FAIL_COUNT -gt 0 ]; then
-            logger -t wankeepalive "Connection restored. Reset counter."
+            logger -t wankeepalive "Vruzkata e vuzstanovena. Zabyrsvane na broyacha."
             FAIL_COUNT=0
         fi
     else
         FAIL_COUNT=$((FAIL_COUNT + 1))
-        logger -t wankeepalive "Verification failed. Consecutive number of errors: $FAIL_COUNT"
+        logger -t wankeepalive "Proverkata se provali! Posledovatelni greshki: $FAIL_COUNT"
 
-        # Router reboot logic (at the higher threshold)
-        if [ $FAIL_COUNT -ge $ROUTER_THRESHOLD ]; then
-            logger -t wankeepalive "Router restart threshold reached ($ROUTER_THRESHOLD errors). Router restarting..."
+        # 1. Restartirane na routera PRI TOCHNO SAVPADENIE na praga
+        if [ $FAIL_COUNT -eq $ROUTER_THRESHOLD ]; then
+            logger -t wankeepalive "Dostignat e pragat za restart na routera ($ROUTER_THRESHOLD greshki). Restartirane..."
             sync
             reboot
             exit 0
         fi
 
-        # Logic for restarting selected interfaces
-        if [ $FAIL_COUNT -ge $IF_THRESHOLD ]; then
-            logger -t wankeepalive "The restart threshold for the selected interfaces has been reached ($IF_THRESHOLD errors)."
+        # 2. Restartirane na interfeysite EDNOKRATNO PRI TOCHNO SAVPADENIE na praga
+        if [ $FAIL_COUNT -eq $IF_THRESHOLD ]; then
+            logger -t wankeepalive "Dostignat e pragat za restart na interfeysite ($IF_THRESHOLD greshki). Ednokratno restartirane..."
             for iface in $TARGET_INTERFACES; do
-                logger -t wankeepalive "Restarting interfaces: $iface"
+                logger -t wankeepalive "Restartirane na interfeys: $iface"
                 ifdown "$iface"
-                sleep 2
+                sleep 3
                 ifup "$iface"
             done
+            sleep 30
         fi
     fi
 
